@@ -3,6 +3,7 @@ from langchain_ollama import OllamaLLM
 
 from database.controllers.database_controller import DatabaseController
 from database.models.message import Message
+from vision import Vision
 
 class SLM:
   """
@@ -12,8 +13,12 @@ class SLM:
   # The database controller.
   db: DatabaseController
 
-  def __init__(self, db: DatabaseController):
+  # The vision model.
+  vision: Vision
+
+  def __init__(self, db: DatabaseController, vision: Vision):
     self.db = db
+    self.vision = vision
 
   def __build_template(self, user_id: int) -> str:
     """Build the template for the conversation."""
@@ -50,7 +55,7 @@ class SLM:
   def __log_message(self, question, answer):
     """Log the message to the console."""
     print(f"You: {question}\n")
-    print(f"Bot: {answer}\n")
+    print(f"Bot: {answer.strip()}\n")
 
   def __log_messages(self, messages: list[Message]):
     """Log the messages to the console."""
@@ -59,10 +64,31 @@ class SLM:
 
   def __log_answer(self, answer: str):
     """Log the answer to the console."""
-    print(f"Bot: {answer}\n")
+    print(f"\nBot: {answer.strip()}\n")
 
-  def handle_conversation(self, user_id: int):
+  def __get_user(self) -> int:
+    """Get the user."""
+
+    print("To start the conversation, please provide a photo so I can identify you 😊\n")
+
+    while True:
+      image_path = input("Enter the image path: ")
+
+      try:
+        prediction = self.vision.predict(image_path)
+        print()
+        break
+      except Exception as e:
+        print("Enter a valid image path.\n")
+
+    return prediction[0]
+
+  def handle_conversation(self):
     """Handle the conversation."""
+
+    # Get the user.
+    user_id = self.__get_user()
+    user_name = self.vision.get_developer_name(user_id).title()
 
     # Get the user's chat history and build the context.
     messages = self.db.messages.get_messages_by_user(user_id)
@@ -73,13 +99,12 @@ class SLM:
     chain = self.__build_chain(template)
 
     # Log the history.
-    self.__log_messages(messages)
+    if len(messages) > 0:
+      print("# Conversation History\n")
+      self.__log_messages(messages)
 
     # Log the welcome message.
-    if len(messages) > 0:
-      print("> Welcome back! Type 'exit' to end the conversation.\n")
-    else:
-      print("> Welcome to the chatbot! Type 'exit' to end the conversation.\n")
+    print(f"> Welcome {user_name}! Type 'exit' to end the conversation.\n")
 
     while True:
       # Get the question from the user.
@@ -96,7 +121,6 @@ class SLM:
 
       # Update the context.
       context += f"User: {question}\nAI: {answer}"
-
 
       # Save to the database.
       self.db.messages.add_message(user_id, question, answer)

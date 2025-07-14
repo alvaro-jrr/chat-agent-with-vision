@@ -21,6 +21,7 @@ class Vision:
 
   def load_image(self, image_path: str) -> np.ndarray:
     """Load the image and preprocess it for the model."""
+    image_path = image_path.strip().strip("'")
 
     # Check if the image exists.
     if not os.path.exists(image_path):
