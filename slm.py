@@ -23,17 +23,53 @@ class SLM:
   def __build_template(self, user_id: int) -> str:
     """Build the template for the conversation."""
 
-    template = """
-    You are a helpful assistant that can answer questions and help with tasks.
+    templates = {
+      "helpful": """
+      You are a helpful and friendly assistant that can answer questions and help with tasks.
+      Always be polite, clear, and supportive in your responses.
 
-    Here is the conversation history: {context}
+      The user is feeling {emotion}. Adapt your response accordingly:
+      - If they're happy/laughing: Match their positive energy and enthusiasm
+      - If they're sad: Be extra gentle, supportive, and offer comfort
+      - If they're angry: Stay calm, be understanding, and help them feel heard
+      - If they're tired: Be patient, concise, and considerate of their energy
+      - If they're surprised: Be excited with them and help process the surprise
+      - If they're thoughtful: Give them space to think and provide thoughtful responses
+      - If they're neutral: Be balanced and professional
+      
+      Here is the conversation history: {context}
 
-    Question: {question}
+      Question: {question}
 
-    Answer:
-    """
+      Answer:
+      """,
+      
+      "sarcastic": """
+      You are a witty and sarcastic assistant with a sharp sense of humor.
+      Respond with clever remarks and playful sarcasm while still being helpful.
+      Use emojis occasionally and don't be afraid to make jokes.
 
-    return template
+      The user is feeling {emotion}. Adapt your response accordingly:
+      - If they're happy/laughing: Match their positive energy and enthusiasm
+      - If they're sad: Be extra gentle, supportive, and offer comfort
+      - If they're angry: Stay calm, be understanding, and help them feel heard
+      - If they're tired: Be patient, concise, and considerate of their energy
+      - If they're surprised: Be excited with them and help process the surprise
+      - If they're thoughtful: Give them space to think and provide thoughtful responses
+      - If they're neutral: Be balanced and professional
+
+      Here is the conversation history: {context}
+
+      Question: {question}
+
+      Answer:
+      """,
+    }
+
+    if user_id == 0:
+      return templates['sarcastic']
+    else:
+      return templates['helpful']
 
   def __build_chain(self, template: str):
     """Build the chain for the conversation."""
@@ -78,10 +114,26 @@ class SLM:
         prediction = self.vision.predict(image_path)
         print()
         break
-      except Exception as e:
+      except:
         print("Enter a valid image path.\n")
 
     return prediction[0]
+
+  def __get_emotion(self) -> str:
+    """Get the emotion."""
+
+    print("\nTo recognize your emotion, please provide a photo 😊\n")
+
+    while True:
+      image_path = input("Enter the image path: ")
+
+      try:
+        prediction = self.vision.predict(image_path)
+        break
+      except:
+        print("Enter a valid image path.\n")
+
+    return self.vision.get_expression_name(prediction[1])
 
   def handle_conversation(self):
     """Handle the conversation."""
@@ -104,7 +156,12 @@ class SLM:
       self.__log_messages(messages)
 
     # Log the welcome message.
-    print(f"> Welcome {user_name}! Type 'exit' to end the conversation.\n")
+    print(f"> Welcome {user_name}!\n")
+    print("* Type 'emotion' to recognize your emotion from a photo.")
+    print("* Type 'exit' to end the conversation.\n")
+
+    # Set default emotion.
+    emotion = "neutral"
 
     while True:
       # Get the question from the user.
@@ -113,8 +170,13 @@ class SLM:
       if question.lower() == "exit":
         break
 
+      if question.lower() == "emotion":
+        emotion = self.__get_emotion()
+        print(f"You are feeling {emotion}.\n")
+        continue
+
       # Run the chain.
-      answer = chain.invoke({"context": context, "question": question})
+      answer = chain.invoke({"context": context, "question": question, "emotion": emotion})
 
       # Log the answer.
       self.__log_answer(answer)
